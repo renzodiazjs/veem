@@ -1,0 +1,23 @@
+{
+  "name": "Nerdearla 2026",
+  "sessions": [
+    {
+      "id": "auditorium-a",
+      "title": "Observability at Scale",
+      "room": "Auditorium A",
+      "language": "en-US",
+      "glossary": ["Nerdearla", "Kubernetes", "OpenTelemetry", "eBPF", "Grafana", "Prometheus"],
+      "source": { "type": "file", "path": "media/spike-a.wav", "loop": true },
+      "autostart": false
+    },
+    {
+      "id": "auditorium-b",
+      "title": "Open Source AI",
+      "room": "Auditorium B",
+      "language": "en-US",
+      "glossary": ["LoRA", "vLLM", "GPU", "Hugging Face"],
+      "source": { "type": "file", "path": "media/spike-b.wav", "loop": true },
+      "autostart": false
+    }
+  ]
+}
