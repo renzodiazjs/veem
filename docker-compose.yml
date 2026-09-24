@@ -1,7 +1,9 @@
 services:
   server:
     build: { context: ., target: server }
+    # Includes PUBLIC_HOST: set it to this machine's LAN IP so room QR codes work from phones.
     env_file: .env
+    init: true
     ports: ["8080:8080"]
     volumes:
       # Stages are defined here; add an entry to run another room.
@@ -19,4 +21,5 @@ services:
     build: { context: ., target: web }
     ports: ["3100:3100"]
     depends_on: [server]
+    init: true
     restart: unless-stopped

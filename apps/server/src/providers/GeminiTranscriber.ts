@@ -65,6 +65,11 @@ export class GeminiTranscriber extends EventEmitter implements SpeechProvider {
         },
       },
     });
+    // close() may have been called while the connection was being established.
+    if (this.closed) {
+      session.close();
+      return;
+    }
     this.live = session;
     this.currentConn = conn;
     this.attempt = 0;
@@ -85,10 +90,12 @@ export class GeminiTranscriber extends EventEmitter implements SpeechProvider {
       }
     } catch (err) {
       this.emit("error", err as Error);
+      if (!this.closed) this.rotateTimer = setTimeout(() => this.rotate(), 30_000);
     }
   }
 
   private reconnect() {
+    if (this.closed) return;
     this.live = undefined;
     this.currentConn = 0;
     this.emit("reconnecting");

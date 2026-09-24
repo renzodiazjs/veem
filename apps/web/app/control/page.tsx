@@ -7,7 +7,7 @@ import { RoomQr } from "@/components/RoomQr";
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-zinc-500">{label}</dt>
+      <dt className="text-sm text-zinc-400">{label}</dt>
       <dd className="font-mono text-lg">{value}</dd>
     </div>
   );
@@ -49,13 +49,20 @@ export default function ControlCenter() {
                 </div>
               </div>
 
+              <div className="mt-5 flex items-baseline gap-3">
+                <p className="font-mono text-5xl font-bold text-emerald-400">{fmtMs(s.latency.esP50)}</p>
+                <p className="text-sm text-zinc-400">
+                  del fin de la frase
+                  <br />
+                  al subtítulo en español (p50)
+                </p>
+              </div>
+
               <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
                 <Stat label="Habla → EN p50" value={fmtMs(s.latency.enP50)} />
-                <Stat label="Habla → ES p50" value={fmtMs(s.latency.esP50)} />
                 <Stat label="Habla → ES p95" value={fmtMs(s.latency.esP95)} />
                 <Stat label="Traducción p50" value={fmtMs(s.latency.mtP50)} />
                 <Stat label="Segmentos" value={s.segmentCount} />
-                <Stat label="Muestras" value={s.latency.samples} />
                 <Stat label="Reconexiones" value={s.reconnects} />
                 <Stat label="Glosario" value={`${s.glossary.length} términos`} />
                 {s.comparison && (
@@ -83,7 +90,7 @@ export default function ControlCenter() {
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => controlSession(s.id, running ? "stop" : "start")}
-                  className={`rounded-lg px-4 py-2 text-sm font-semibold ${running ? "bg-zinc-800 hover:bg-zinc-700" : "bg-red-600 hover:bg-red-500"}`}
+                  className={`min-h-11 rounded-lg px-4 text-sm font-semibold ${running ? "bg-zinc-800 hover:bg-zinc-700" : "bg-red-600 hover:bg-red-500"}`}
                 >
                   {running ? "Detener" : "Iniciar"}
                 </button>

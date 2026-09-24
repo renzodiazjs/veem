@@ -19,7 +19,7 @@ function Highlighted({ text, matcher }: { text: string; matcher: RegExp | null }
     <>
       {parts.map((p, i) =>
         i % 2 === 1 ? (
-          <mark key={i} className="rounded bg-emerald-400/20 px-1 text-emerald-300">
+          <mark key={i} className="rounded bg-emerald-400/20 px-1 font-semibold text-emerald-300 underline decoration-emerald-400/60 underline-offset-4">
             {p}
           </mark>
         ) : (
@@ -99,8 +99,15 @@ export default function ComparePage() {
           <Link href="/control" className="text-sm font-semibold uppercase tracking-widest text-red-500">
             Technical Context Engine
           </Link>
-          <h1 className="text-2xl font-bold">
-            {summary?.title ?? id} <span className="font-normal text-zinc-400">· {summary?.speaker}</span>
+          <h1 className="flex flex-wrap items-center gap-3 text-2xl font-bold">
+            <span>
+              {summary?.title ?? id} <span className="font-normal text-zinc-400">· {summary?.speaker}</span>
+            </span>
+            {cmp && cmp.withContext - cmp.withoutContext > 0 && (
+              <span className="rounded-full bg-emerald-500 px-4 py-1 text-2xl font-bold text-zinc-950">
+                +{cmp.withContext - cmp.withoutContext} términos
+              </span>
+            )}
           </h1>
         </div>
         <div className="flex items-center gap-2 text-sm">
@@ -131,7 +138,7 @@ export default function ComparePage() {
       </div>
 
       {diffTerms.length > 0 && (
-        <footer className="flex flex-wrap gap-2 text-sm">
+        <footer className="flex flex-wrap gap-2 text-base">
           {diffTerms.map(([term, w, wo]) => (
             <span key={term} className="rounded-full border border-zinc-800 bg-zinc-900 px-3 py-1">
               {term} <span className="font-mono text-zinc-500">{wo}</span> → <span className="font-mono text-emerald-400">{w}</span>

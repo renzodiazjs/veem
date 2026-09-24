@@ -123,10 +123,11 @@ export class LiveSession {
       await stt.connect();
     } catch (err) {
       console.error(`[${this.id}] could not connect:`, (err as Error).message);
-      this.setHealth("error");
+      if (run === this.runId) this.setHealth("error");
       return;
     }
-    if (run !== this.runId) return;
+    // Stopped or restarted while connecting: don't leave an orphan connection.
+    if (run !== this.runId) return stt.close();
 
     if (this.config.compareBaseline) {
       const baseline = new GeminiTranscriber({ languageCodes: [this.config.language], vocabulary: [] });
@@ -134,11 +135,11 @@ export class LiveSession {
       baseline.on("error", (err: Error) => console.error(`[${this.id}] baseline stt error:`, err.message));
       try {
         await baseline.connect();
-        this.baselineStt = baseline;
       } catch (err) {
         console.error(`[${this.id}] baseline disabled:`, (err as Error).message);
       }
       if (run !== this.runId) return baseline.close();
+      this.baselineStt = baseline;
     }
 
     const source = new FileSource(this.config.source.path, this.config.source.startAtSec);
@@ -150,7 +151,13 @@ export class LiveSession {
       this.baselineStt?.send(pcm);
     });
     source.on("error", (err: Error) => {
+      if (run !== this.runId) return;
       console.error(`[${this.id}] audio error:`, err.message);
+      // No audio → release the transcribers so they don't reconnect in a loop.
+      this.stt?.close();
+      this.baselineStt?.close();
+      this.stt = undefined;
+      this.baselineStt = undefined;
       this.setHealth("error");
     });
     source.on("end", () => this.onAudioEnd(run));

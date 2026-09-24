@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg && rm -r
 ENV SESSIONS_FILE=/app/sessions.json SERVER_PORT=8080
 EXPOSE 8080
 WORKDIR /app/apps/server
-CMD ["pnpm", "exec", "tsx", "src/index.ts"]
+CMD ["node", "--import", "tsx", "src/index.ts"]
 
 FROM base AS web
 ENV NEXT_TELEMETRY_DISABLED=1

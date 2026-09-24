@@ -76,6 +76,7 @@ wss.on("connection", (ws) => {
     } catch {
       return send(ws, { t: "error", message: "invalid json" });
     }
+    if (!msg || typeof msg !== "object") return send(ws, { t: "error", message: "invalid message" });
     if (msg.t === "watchSessions") {
       watchers.add(ws);
       send(ws, { t: "sessions", list: manager.list(), serverTime: Date.now(), lanHosts: lanHosts() });
@@ -111,5 +112,8 @@ const shutdown = () => {
   manager.stopAll();
   process.exit(0);
 };
+// One bad message or provider callback must never take every room down.
+process.on("uncaughtException", (err) => console.error("[uncaught]", err));
+process.on("unhandledRejection", (err) => console.error("[unhandled]", err));
 process.on("SIGINT", shutdown);
 process.on("SIGTERM", shutdown);

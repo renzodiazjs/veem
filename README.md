@@ -89,7 +89,7 @@ Open **http://localhost:3100/control**, press **Iniciar** on any room, and open 
 ### With Docker
 
 ```bash
-cp .env.example .env
+cp .env.example .env          # required: compose reads it; set PUBLIC_HOST to your LAN IP for QR codes
 node scripts/fetch-demo-audio.mjs
 docker compose up --build
 ```
