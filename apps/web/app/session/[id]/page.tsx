@@ -91,8 +91,8 @@ export default function CaptionsPage() {
             A+
           </button>
         </div>
-        <p className="ml-auto font-mono text-xs text-zinc-500" title="Pipeline p50: audio enviado → traducción recibida">
-          latencia p50 {fmtMs(summary?.latency.totalP50)}
+        <p className="ml-auto font-mono text-xs text-zinc-500" title="Mediana del retraso entre el fin de una frase hablada y su subtítulo">
+          retraso {lang === "es" ? fmtMs(summary?.latency.esP50) : fmtMs(summary?.latency.enP50)}
         </p>
       </div>
 

@@ -8,11 +8,11 @@ function percentile(values: number[], p: number): number | null {
   return Math.round(sorted[Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))]);
 }
 
-/** Rolling window of the last WINDOW segments' latencies. */
+/** Rolling window of the last WINDOW measurements per stage. */
 export class LatencyTracker {
-  private stt: number[] = [];
+  private en: number[] = [];
+  private es: number[] = [];
   private mt: number[] = [];
-  private total: number[] = [];
 
   private push(arr: number[], v: number) {
     arr.push(v);
@@ -20,30 +20,31 @@ export class LatencyTracker {
   }
 
   recordTranscript(seg: Segment) {
-    this.push(this.stt, seg.lat.transcriptReceivedAt - seg.lat.audioSentAt);
+    if (seg.lat.speechEndAt) this.push(this.en, seg.lat.transcriptReceivedAt - seg.lat.speechEndAt);
   }
 
   recordTranslation(seg: Segment) {
-    const { audioSentAt, transcriptReceivedAt, translationReceivedAt } = seg.lat;
+    const { speechEndAt, transcriptReceivedAt, translationReceivedAt } = seg.lat;
     if (!translationReceivedAt) return;
     this.push(this.mt, translationReceivedAt - transcriptReceivedAt);
-    this.push(this.total, translationReceivedAt - audioSentAt);
+    if (speechEndAt) this.push(this.es, translationReceivedAt - speechEndAt);
   }
 
   stats(): LatencyStats {
     return {
-      sttP50: percentile(this.stt, 50),
+      enP50: percentile(this.en, 50),
+      enP95: percentile(this.en, 95),
+      esP50: percentile(this.es, 50),
+      esP95: percentile(this.es, 95),
       mtP50: percentile(this.mt, 50),
       mtP95: percentile(this.mt, 95),
-      totalP50: percentile(this.total, 50),
-      totalP95: percentile(this.total, 95),
-      last: this.total.at(-1) ?? null,
+      samples: this.es.length,
     };
   }
 
   reset() {
-    this.stt = [];
+    this.en = [];
+    this.es = [];
     this.mt = [];
-    this.total = [];
   }
 }

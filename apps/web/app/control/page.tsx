@@ -48,11 +48,13 @@ export default function ControlCenter() {
                 </div>
               </div>
 
-              <dl className="mt-5 grid grid-cols-3 gap-4">
-                <Stat label="Pipeline p50" value={fmtMs(s.latency.totalP50)} />
-                <Stat label="Pipeline p95" value={fmtMs(s.latency.totalP95)} />
+              <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <Stat label="Habla → EN p50" value={fmtMs(s.latency.enP50)} />
+                <Stat label="Habla → ES p50" value={fmtMs(s.latency.esP50)} />
+                <Stat label="Habla → ES p95" value={fmtMs(s.latency.esP95)} />
                 <Stat label="Traducción p50" value={fmtMs(s.latency.mtP50)} />
                 <Stat label="Segmentos" value={s.segmentCount} />
+                <Stat label="Muestras" value={s.latency.samples} />
                 <Stat label="Reconexiones" value={s.reconnects} />
                 <Stat label="Glosario" value={`${s.glossary.length} términos`} />
               </dl>

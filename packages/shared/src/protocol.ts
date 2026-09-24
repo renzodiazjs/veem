@@ -3,11 +3,12 @@ export type Health = "idle" | "connecting" | "live" | "reconnecting" | "ended" |
 
 /**
  * Wall-clock timestamps (server clock, ms) for one caption segment.
- * audioSentAt is the send time of the last audio chunk before the transcript
- * arrived, so transcriptReceivedAt - audioSentAt is a lower bound of STT lag.
+ * speechEndAt is set only for segments flushed at the end of an utterance: it is
+ * the send time of the last voiced audio chunk (local energy detection), which
+ * is the one point where "speech → caption" can be measured honestly.
  */
 export interface SegmentLatency {
-  audioSentAt: number;
+  speechEndAt?: number;
   transcriptReceivedAt: number;
   translationReceivedAt?: number;
 }
@@ -20,15 +21,16 @@ export interface Segment {
 }
 
 export interface LatencyStats {
-  /** STT lag lower bound: last audio chunk sent → sentence committed */
-  sttP50: number | null;
-  /** Translation round-trip: sentence committed → Spanish received */
+  /** End of speech → English caption (utterance-end segments only) */
+  enP50: number | null;
+  enP95: number | null;
+  /** End of speech → Spanish caption (utterance-end segments only) */
+  esP50: number | null;
+  esP95: number | null;
+  /** Translation round-trip for every segment: EN committed → ES received */
   mtP50: number | null;
   mtP95: number | null;
-  /** Pipeline: last audio chunk sent → Spanish received */
-  totalP50: number | null;
-  totalP95: number | null;
-  last: number | null;
+  samples: number;
 }
 
 export interface SessionSummary {

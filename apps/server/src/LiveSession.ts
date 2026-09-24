@@ -4,6 +4,7 @@ import { CHUNK_BYTES, FileSource, type AudioSource } from "./audio/FileSource";
 import { GeminiTranscriber, type SpeechProvider } from "./providers/GeminiTranscriber";
 import type { Translator } from "./providers/Translator";
 import { SentenceSegmenter } from "./SentenceSegmenter";
+import { rms, SPEECH_RMS } from "./audio/energy";
 import { LatencyTracker } from "./metrics";
 import type { SessionConfig } from "./config";
 
@@ -20,7 +21,8 @@ export class LiveSession {
   private nextSegId = 1;
   private startedAt: number | null = null;
   private reconnects = 0;
-  private lastAudioSentAt = 0;
+  /** Send time of the most recent chunk that contained speech. */
+  private lastVoicedAt = 0;
   /** Bumped on every start so late callbacks from a previous run are ignored. */
   private runId = 0;
 
@@ -90,7 +92,7 @@ export class LiveSession {
     const source = new FileSource(this.config.source.path, this.config.source.startAtSec);
     this.source = source;
     source.on("chunk", (pcm: Buffer) => {
-      this.lastAudioSentAt = Date.now();
+      if (rms(pcm) > SPEECH_RMS) this.lastVoicedAt = Date.now();
       stt.send(pcm);
     });
     source.on("error", (err: Error) => {
@@ -131,13 +133,14 @@ export class LiveSession {
 
   private onInterim(text: string) {
     const { commits, pending } = this.segmenter.interim(text);
-    commits.forEach((s) => this.commit(s));
+    commits.forEach((s) => this.commit(s, false));
     this.setInterim(pending);
   }
 
   private onFinal(text: string) {
     const { commits } = this.segmenter.final(text);
-    commits.forEach((s) => this.commit(s));
+    // Only the last sentence of an utterance ends where the speech ended.
+    commits.forEach((s, i) => this.commit(s, i === commits.length - 1));
     this.setInterim("");
   }
 
@@ -147,11 +150,15 @@ export class LiveSession {
     this.broadcast({ t: "interim", sessionId: this.id, text }, true);
   }
 
-  private commit(en: string) {
+  private commit(en: string, utteranceEnd: boolean) {
+    const now = Date.now();
     const seg: Segment = {
       id: this.nextSegId++,
       en,
-      lat: { audioSentAt: this.lastAudioSentAt, transcriptReceivedAt: Date.now() },
+      lat: {
+        transcriptReceivedAt: now,
+        ...(utteranceEnd && this.lastVoicedAt && now - this.lastVoicedAt < 10_000 ? { speechEndAt: this.lastVoicedAt } : {}),
+      },
     };
     const context = this.segments.slice(-TRANSLATION_CONTEXT).map((s) => s.en);
     this.segments.push(seg);
