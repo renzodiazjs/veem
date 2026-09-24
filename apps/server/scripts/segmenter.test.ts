@@ -21,7 +21,7 @@ test("final does not duplicate already committed sentences", () => {
   const s = new SentenceSegmenter();
   s.interim("Hello, thank you for joining me. for my talk");
   const r = s.final("Hello, thank you for joining me. for my talk, Data Modeling for Software Engineers.");
-  assert.deepEqual(r.commits, ["for my talk, Data Modeling for Software Engineers."]);
+  assert.deepEqual(r.commits, ["For my talk, Data Modeling for Software Engineers."]);
 });
 
 test("final rewording of a committed sentence is skipped", () => {
@@ -36,9 +36,18 @@ test("short sentence sharing common words with a previous one is kept", () => {
   assert.deepEqual(s.final("I also do speaking. Obviously, I'm here today.").commits, ["I also do speaking.", "Obviously, I'm here today."]);
 });
 
-test("final that merges several committed sentences is skipped", () => {
+test("final that merges committed sentences keeps only the new part", () => {
   const s = new SentenceSegmenter();
   s.interim("It takes me over an hour and a half, and when I get back to her, it's dark. She's freezing. She's frightened. And");
   const r = s.final("It takes me over an hour and a half, and when I get back to her, it's dark, she doesn't have a torch, she's freezing, she's frightened, and she's in bits.");
-  assert.deepEqual(r.commits, []);
+  assert.equal(r.commits.length, 1);
+  assert.match(r.commits[0], /^She doesn't have a torch/);
+  assert.doesNotMatch(r.commits[0], /hour and a half/);
+});
+
+test("final that extends a committed sentence only adds the extension", () => {
+  const s = new SentenceSegmenter();
+  s.interim("This is more of a talk about why we do data modeling, not so much a how, just to give you a context. But");
+  const r = s.final("This is more of a talk about why we do data modeling, not so much a how, just to give you a context, but we're going to talk about some of the things that I think are important in data modeling.");
+  assert.deepEqual(r.commits, ["But we're going to talk about some of the things that I think are important in data modeling."]);
 });

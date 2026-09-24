@@ -10,8 +10,14 @@ import { TermCounter } from "./context/termCounter";
 import type { SessionConfig } from "./config";
 
 const MAX_SEGMENTS = 500;
+/** Full-talk archive for caption export (~10 KB per 100 segments). */
+const MAX_ARCHIVE = 20_000;
 const TRANSLATION_CONTEXT = 2;
 const MAX_BASELINE_LINES = 100;
+/** Average speaking rate used to lay sentences out on the audio timeline. */
+const WORDS_PER_SEC = 2.7;
+/** Typical lag between speech and an interim sentence becoming stable. */
+const INTERIM_LAG_MS = 800;
 /** Drop interim updates for clients whose send buffer is backed up (bytes). */
 const SLOW_CLIENT_BYTES = 1_000_000;
 
@@ -19,6 +25,10 @@ export class LiveSession {
   readonly id: string;
   private health: Health = "idle";
   private segments: Segment[] = [];
+  private archive: Segment[] = [];
+  /** Milliseconds of audio fed to the transcriber in this run (audio timeline). */
+  private audioMs = 0;
+  private lastSegEndMs = 0;
   private interim = "";
   private nextSegId = 1;
   private startedAt: number | null = null;
@@ -43,6 +53,11 @@ export class LiveSession {
     this.id = config.id;
     this.termsWith = new TermCounter(config.glossary);
     this.termsWithout = new TermCounter(config.glossary);
+  }
+
+  /** Every segment of the current run, for caption export. */
+  transcript(): readonly Segment[] {
+    return this.archive;
   }
 
   summary(): SessionSummary {
@@ -75,6 +90,9 @@ export class LiveSession {
     this.stop();
     const run = ++this.runId;
     this.segments = [];
+    this.archive = [];
+    this.audioMs = 0;
+    this.lastSegEndMs = 0;
     this.interim = "";
     this.nextSegId = 1;
     this.reconnects = 0;
@@ -127,6 +145,7 @@ export class LiveSession {
     this.source = source;
     source.on("chunk", (pcm: Buffer) => {
       this.speechEnd.push(pcm);
+      this.audioMs += (pcm.length / 2 / 16000) * 1000;
       stt.send(pcm);
       this.baselineStt?.send(pcm);
     });
@@ -173,7 +192,7 @@ export class LiveSession {
 
   private onInterim(text: string) {
     const { commits, pending } = this.segmenter.interim(text);
-    commits.forEach((s) => this.commit(s, false));
+    this.commitBatch(commits, this.audioMs - INTERIM_LAG_MS, false);
     this.setInterim(pending);
   }
 
@@ -181,8 +200,9 @@ export class LiveSession {
     // A/B fairness: both sides count glossary terms on finals only.
     this.termsWith.add(text);
     const { commits } = this.segmenter.final(text);
-    // Only the last sentence of an utterance ends where the speech ended.
-    commits.forEach((s, i) => this.commit(s, i === commits.length - 1));
+    const speechEndAt = this.speechEnd.lastSpeechEndAt;
+    const anchor = speechEndAt && Date.now() - speechEndAt < 10_000 ? this.audioMs - (Date.now() - speechEndAt) : this.audioMs;
+    this.commitBatch(commits, anchor, true);
     this.setInterim("");
   }
 
@@ -200,11 +220,32 @@ export class LiveSession {
     this.broadcast({ t: "interim", sessionId: this.id, text }, true);
   }
 
-  private commit(en: string, utteranceEnd: boolean) {
+  /**
+   * Lays a batch of sentences out on the audio timeline, walking backwards from
+   * where the batch ends and giving each sentence a duration from its word count.
+   * Only the last sentence of an utterance ends where speech actually ended.
+   */
+  private commitBatch(sentences: string[], anchorEndMs: number, utteranceEnd: boolean) {
+    if (!sentences.length) return;
+    const spans: [number, number][] = [];
+    let cursor = Math.max(this.lastSegEndMs, anchorEndMs);
+    for (let i = sentences.length - 1; i >= 0; i--) {
+      const dur = (sentences[i].split(/\s+/).length / WORDS_PER_SEC) * 1000;
+      const start = Math.max(this.lastSegEndMs, cursor - dur);
+      spans[i] = [Math.round(start), Math.round(Math.max(cursor, start + 300))];
+      cursor = start;
+    }
+    sentences.forEach((en, i) => this.commit(en, spans[i][0], spans[i][1], utteranceEnd && i === sentences.length - 1));
+  }
+
+  private commit(en: string, startMs: number, endMs: number, utteranceEnd: boolean) {
     const now = Date.now();
     const speechEndAt = this.speechEnd.lastSpeechEndAt;
+    this.lastSegEndMs = Math.max(this.lastSegEndMs, endMs);
     const seg: Segment = {
       id: this.nextSegId++,
+      startMs,
+      endMs,
       en,
       lat: {
         transcriptReceivedAt: now,
@@ -214,6 +255,8 @@ export class LiveSession {
     const context = this.segments.slice(-TRANSLATION_CONTEXT).map((s) => s.en);
     this.segments.push(seg);
     if (this.segments.length > MAX_SEGMENTS) this.segments.shift();
+    this.archive.push(seg);
+    if (this.archive.length > MAX_ARCHIVE) this.archive.shift();
     this.latency.recordTranscript(seg);
     this.broadcast({ t: "final", sessionId: this.id, seg });
     this.translate(seg, context, this.runId);

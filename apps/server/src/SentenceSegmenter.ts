@@ -19,6 +19,10 @@ export interface SegmenterResult {
 const SENTENCE = /[^.?!]*[.?!]+(?=\s|$)/g;
 const RECENT = 12;
 const OVERLAP = 0.6;
+/** Shorter leftovers after removing known text are treated as noise. */
+const MIN_NOVEL_WORDS = 3;
+
+const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function splitSentences(text: string): { sentences: string[]; rest: string } {
   const sentences: string[] = [];
@@ -34,6 +38,7 @@ export function splitSentences(text: string): { sentences: string[]; rest: strin
 function words(s: string): string[] {
   return s
     .toLowerCase()
+    .replace(/['’]/g, "")
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)
     .filter(Boolean);
@@ -57,14 +62,38 @@ export function overlap(candidate: string, committed: string): number {
 export class SentenceSegmenter {
   private recent: string[] = [];
 
-  private isKnown(sentence: string) {
-    return overlap(sentence, this.recent.join(" ")) >= OVERLAP;
+  /**
+   * Returns the part of `sentence` not already shown, or null if nothing new:
+   *  - a known prefix (≥4 words) is cut off, so extensions of a committed
+   *    sentence only add their new words;
+   *  - a mostly-known sentence keeps only the tail after its last known bigram.
+   */
+  private novel(sentence: string): string | null {
+    const pool = new Set(grams(this.recent.join(" ")));
+    const tokens = sentence.split(/\s+/).filter(Boolean);
+    const norm = tokens.map((t) => words(t).join(" "));
+    const known = (i: number) => i > 0 && pool.has(`${norm[i - 1]} ${norm[i]}`);
+
+    let start = 0;
+    while (known(start + 1)) start++;
+    if (start >= 3) tokens.splice(0, start + 1), norm.splice(0, start + 1);
+    else start = -1;
+
+    const rest = tokens.join(" ");
+    if (start >= 0 && tokens.length < MIN_NOVEL_WORDS) return null;
+    if (overlap(rest, this.recent.join(" ")) < OVERLAP) return capitalize(rest.replace(/^[,;:\s]+/, ""));
+
+    let last = 0;
+    for (let i = 1; i < norm.length; i++) if (known(i)) last = i;
+    const tail = tokens.slice(last + 1);
+    return tail.length >= MIN_NOVEL_WORDS ? capitalize(tail.join(" ").replace(/^[,;:\s]+/, "")) : null;
   }
 
   private take(sentences: string[]): string[] {
     const out: string[] = [];
-    for (const s of sentences) {
-      if (this.isKnown(s)) continue;
+    for (const sentence of sentences) {
+      const s = this.novel(sentence);
+      if (!s) continue;
       out.push(s);
       this.recent.push(s);
       if (this.recent.length > RECENT) this.recent.shift();

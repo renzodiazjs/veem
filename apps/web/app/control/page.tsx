@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { controlSession, fmtMs, HEALTH_LABEL, useSessions } from "@/lib/veem";
+import { audienceUrl, controlSession, exportUrl, fmtMs, HEALTH_LABEL, useSessions } from "@/lib/veem";
+import { RoomQr } from "@/components/RoomQr";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -13,7 +14,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 }
 
 export default function ControlCenter() {
-  const { sessions, connected } = useSessions();
+  const { sessions, lanHosts, connected } = useSessions();
   const live = sessions.filter((s) => s.health === "live").length;
 
   return (
@@ -31,7 +32,7 @@ export default function ControlCenter() {
         </p>
       </header>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2">
         {sessions.map((s) => {
           const h = HEALTH_LABEL[s.health];
           const running = s.health === "live" || s.health === "connecting" || s.health === "reconnecting";
@@ -62,7 +63,24 @@ export default function ControlCenter() {
                 )}
               </dl>
 
-              <div className="mt-5 flex gap-2">
+              <div className="mt-5 flex items-center gap-4 border-t border-zinc-800 pt-4">
+                <RoomQr url={audienceUrl(s.id, lanHosts)} size={96} />
+                <div className="min-w-0 text-sm">
+                  <p className="text-zinc-400">Escaneá para ver los subtítulos</p>
+                  <p className="truncate font-mono text-xs text-zinc-500">{audienceUrl(s.id, lanHosts)}</p>
+                  <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-zinc-300">
+                    {(["vtt", "srt", "txt"] as const).flatMap((fmt) =>
+                      (["en", "es"] as const).map((lang) => (
+                        <a key={fmt + lang} href={exportUrl(s.id, fmt, lang)} className="underline decoration-zinc-600 hover:text-white">
+                          .{lang}.{fmt}
+                        </a>
+                      )),
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   onClick={() => controlSession(s.id, running ? "stop" : "start")}
                   className={`rounded-lg px-4 py-2 text-sm font-semibold ${running ? "bg-zinc-800 hover:bg-zinc-700" : "bg-red-600 hover:bg-red-500"}`}

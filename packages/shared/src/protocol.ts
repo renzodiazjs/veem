@@ -15,6 +15,9 @@ export interface SegmentLatency {
 
 export interface Segment {
   id: number;
+  /** Position in the session's audio (ms since the session started), for VTT/SRT export */
+  startMs: number;
+  endMs: number;
   en: string;
   es?: string;
   lat: SegmentLatency;
@@ -63,7 +66,7 @@ export type ClientMsg =
   | { t: "watchSessions" };
 
 export type ServerMsg =
-  | { t: "sessions"; list: SessionSummary[]; serverTime: number }
+  | { t: "sessions"; list: SessionSummary[]; serverTime: number; lanHosts: string[] }
   | { t: "snapshot"; sessionId: string; summary: SessionSummary; segments: Segment[]; interim: string; baseline: { id: number; text: string }[] }
   | { t: "interim"; sessionId: string; text: string }
   | { t: "final"; sessionId: string; seg: Segment }

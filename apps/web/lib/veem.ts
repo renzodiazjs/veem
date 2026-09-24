@@ -58,10 +58,26 @@ function useSocket(onOpen: ClientMsg[], onMessage: (msg: ServerMsg) => void) {
 
 export function useSessions() {
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  const [lanHosts, setLanHosts] = useState<string[]>([]);
   const connected = useSocket([{ t: "watchSessions" }], (msg) => {
-    if (msg.t === "sessions") setSessions(msg.list);
+    if (msg.t !== "sessions") return;
+    setSessions(msg.list);
+    setLanHosts((prev) => (prev.join() === msg.lanHosts.join() ? prev : msg.lanHosts));
   });
-  return { sessions, connected };
+  return { sessions, lanHosts, connected };
+}
+
+/** Public URL of a room's captions: LAN IP when browsing on localhost, so phones can scan it. */
+export function audienceUrl(sessionId: string, lanHosts: string[]) {
+  if (typeof window === "undefined") return "";
+  const { protocol, hostname, port } = window.location;
+  const local = hostname === "localhost" || hostname === "127.0.0.1";
+  const host = local && lanHosts[0] ? lanHosts[0] : hostname;
+  return `${protocol}//${host}${port ? ":" + port : ""}/session/${sessionId}`;
+}
+
+export function exportUrl(sessionId: string, format: "vtt" | "srt" | "txt", lang: "en" | "es") {
+  return `${serverHttpUrl()}/api/sessions/${sessionId}/captions.${format}?lang=${lang}`;
 }
 
 export interface CaptionState {

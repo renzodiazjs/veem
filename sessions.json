@@ -25,7 +25,7 @@
         "path": "media/talk-a.wav"
       },
       "autostart": false,
-      "compareBaseline": true
+      "compareBaseline": false
     },
     {
       "id": "auditorium-b",
@@ -50,7 +50,7 @@
         "path": "media/talk-b.wav"
       },
       "autostart": false,
-      "compareBaseline": true
+      "compareBaseline": false
     },
     {
       "id": "auditorium-c",

@@ -1,9 +1,21 @@
 import { createServer, type ServerResponse } from "node:http";
+import { networkInterfaces } from "node:os";
 import { WebSocketServer, type WebSocket } from "ws";
 import type { ClientMsg, ServerMsg } from "@veem/shared";
 import { loadConfig } from "./config";
 import { SessionManager } from "./SessionManager";
 import { createTranslator } from "./providers/Translator";
+import { toSrt, toTxt, toVtt } from "./export/captions";
+import type { Lang } from "@veem/shared";
+
+/** LAN IPv4 addresses, so QR codes point somewhere a phone in the room can reach. */
+function lanHosts() {
+  if (process.env.PUBLIC_HOST) return [process.env.PUBLIC_HOST];
+  return Object.values(networkInterfaces())
+    .flat()
+    .filter((n) => n && n.family === "IPv4" && !n.internal)
+    .map((n) => n!.address);
+}
 
 const port = Number(process.env.SERVER_PORT ?? 8080);
 const conference = loadConfig();
@@ -34,6 +46,20 @@ const http = createServer((req, res) => {
     else session.stop();
     return json(res, 200, session.summary());
   }
+  const exp = url.pathname.match(/^\/api\/sessions\/([\w-]+)\/captions\.(vtt|srt|txt)$/);
+  if (exp && req.method === "GET") {
+    const session = manager.get(exp[1]);
+    if (!session) return json(res, 404, { error: "unknown session" });
+    const lang: Lang = url.searchParams.get("lang") === "es" ? "es" : "en";
+    const format = exp[2] as "vtt" | "srt" | "txt";
+    const body = { vtt: toVtt, srt: toSrt, txt: toTxt }[format](session.transcript(), lang);
+    res.writeHead(200, {
+      "content-type": format === "vtt" ? "text/vtt; charset=utf-8" : "text/plain; charset=utf-8",
+      "content-disposition": `attachment; filename="${session.id}.${lang}.${format}"`,
+      "access-control-allow-origin": "*",
+    });
+    return res.end(body);
+  }
   json(res, 404, { error: "not found" });
 });
 
@@ -52,7 +78,7 @@ wss.on("connection", (ws) => {
     }
     if (msg.t === "watchSessions") {
       watchers.add(ws);
-      send(ws, { t: "sessions", list: manager.list(), serverTime: Date.now() });
+      send(ws, { t: "sessions", list: manager.list(), serverTime: Date.now(), lanHosts: lanHosts() });
     } else if (msg.t === "subscribe") {
       const session = manager.get(msg.sessionId);
       if (!session) return send(ws, { t: "error", message: `unknown session ${msg.sessionId}` });
@@ -71,7 +97,7 @@ wss.on("connection", (ws) => {
 // Lobby + Control Center refresh: health, segment counts and latency once per second.
 setInterval(() => {
   if (!watchers.size) return;
-  const data = JSON.stringify({ t: "sessions", list: manager.list(), serverTime: Date.now() } satisfies ServerMsg);
+  const data = JSON.stringify({ t: "sessions", list: manager.list(), serverTime: Date.now(), lanHosts: lanHosts() } satisfies ServerMsg);
   for (const ws of watchers) if (ws.readyState === ws.OPEN) ws.send(data);
 }, 1000);
 
