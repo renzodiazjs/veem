@@ -3,20 +3,45 @@
   "sessions": [
     {
       "id": "auditorium-a",
-      "title": "Observability at Scale",
+      "title": "Human-Centric Engineering: Purpose Over KPIs",
       "room": "Auditorium A",
+      "speaker": "Ben Popplestone",
       "language": "en-US",
-      "glossary": ["Nerdearla", "Kubernetes", "OpenTelemetry", "eBPF", "Grafana", "Prometheus"],
-      "source": { "type": "file", "path": "media/spike-a.wav", "loop": true },
+      "glossary": [
+        "Nerdearla",
+        "Ben Popplestone",
+        "KPIs",
+        "Summit fever",
+        "Adventure Mindset",
+        "Guide Mentality",
+        "Adventure Mentors",
+        "Adobe Commerce",
+        "Magento",
+        "APAC",
+        "P&L"
+      ],
+      "source": { "type": "file", "path": "media/talk-a.wav" },
       "autostart": false
     },
     {
       "id": "auditorium-b",
-      "title": "Open Source AI",
+      "title": "Data Modeling for Software Engineers",
       "room": "Auditorium B",
+      "speaker": "Scott Sosna",
       "language": "en-US",
-      "glossary": ["LoRA", "vLLM", "GPU", "Hugging Face"],
-      "source": { "type": "file", "path": "media/spike-b.wav", "loop": true },
+      "glossary": [
+        "Nerdearla",
+        "Scott Sosna",
+        "data modeling",
+        "API payloads",
+        "Redis",
+        "Agile",
+        "JSON",
+        "schema",
+        "metadata",
+        "data architects"
+      ],
+      "source": { "type": "file", "path": "media/talk-b.wav" },
       "autostart": false
     }
   ]

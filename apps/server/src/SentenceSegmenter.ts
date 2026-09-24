@@ -1,11 +1,13 @@
 /**
- * Turns Gemini's cumulative interim transcripts into stable sentences as early
- * as possible, so translation does not have to wait for a speech pause.
+ * Turns Gemini's interim transcripts into stable sentences as early as
+ * possible, so translation does not have to wait for a speech pause.
  *
- * A sentence is "stable" once more text follows its closing punctuation.
- * The final transcript of an utterance flushes everything not yet committed.
- * Commits are tracked by sentence count, so small wording revisions between
- * interim and final never duplicate text.
+ * Gemini's interim text is a sliding window: it grows at the end and gets
+ * trimmed at the start, and the final transcript may reword the interim.
+ * So sentences are deduplicated by content, never by position:
+ *  - a sentence is "stable" once more text follows its closing punctuation;
+ *  - it is committed unless it overlaps heavily with a recent commit
+ *    (catches trimmed prefixes like "to Nerdearla." and final rewordings).
  */
 export interface SegmenterResult {
   commits: string[];
@@ -13,6 +15,8 @@ export interface SegmenterResult {
 }
 
 const SENTENCE = /[^.?!]*[.?!]+(?=\s|$)/g;
+const RECENT = 12;
+const OVERLAP = 0.6;
 
 export function splitSentences(text: string): { sentences: string[]; rest: string } {
   const sentences: string[] = [];
@@ -25,27 +29,62 @@ export function splitSentences(text: string): { sentences: string[]; rest: strin
   return { sentences, rest: text.slice(end).trim() };
 }
 
+function words(s: string): string[] {
+  return s
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** Word bigrams (unigram for one-word text), so short sentences sharing common words don't collide. */
+function grams(s: string): string[] {
+  const w = words(s);
+  if (w.length < 2) return w;
+  return w.slice(1).map((x, i) => `${w[i]} ${x}`);
+}
+
+/** Share of `candidate`'s word bigrams already present in `committed`. */
+export function overlap(candidate: string, committed: string): number {
+  const c = grams(candidate);
+  if (!c.length) return 1;
+  const pool = new Set([...grams(committed), ...words(committed)]);
+  return c.filter((g) => pool.has(g)).length / c.length;
+}
+
 export class SentenceSegmenter {
-  private committed = 0;
+  private recent: string[] = [];
+
+  private isKnown(sentence: string) {
+    return this.recent.some((r) => overlap(sentence, r) >= OVERLAP);
+  }
+
+  private take(sentences: string[]): string[] {
+    const out: string[] = [];
+    for (const s of sentences) {
+      if (this.isKnown(s)) continue;
+      out.push(s);
+      this.recent.push(s);
+      if (this.recent.length > RECENT) this.recent.shift();
+    }
+    return out;
+  }
 
   interim(text: string): SegmenterResult {
     const { sentences, rest } = splitSentences(text);
-    // Last sentence is only stable if something already follows it.
-    const stable = rest ? sentences.length : Math.max(0, sentences.length - 1);
-    const commits = sentences.slice(this.committed, stable);
-    this.committed = Math.max(this.committed, stable);
-    const pending = [...sentences.slice(this.committed), rest].filter(Boolean).join(" ");
-    return { commits, pending };
+    // The last sentence is only stable if something already follows it.
+    const stableCount = rest ? sentences.length : Math.max(0, sentences.length - 1);
+    const commits = this.take(sentences.slice(0, stableCount));
+    const tail = [...sentences.slice(stableCount), rest].filter(Boolean).join(" ");
+    return { commits, pending: tail };
   }
 
   final(text: string): SegmenterResult {
     const { sentences, rest } = splitSentences(text);
-    const commits = [...sentences, rest].filter(Boolean).slice(this.committed);
-    this.committed = 0;
-    return { commits, pending: "" };
+    return { commits: this.take([...sentences, rest].filter(Boolean)), pending: "" };
   }
 
   reset() {
-    this.committed = 0;
+    this.recent = [];
   }
 }
