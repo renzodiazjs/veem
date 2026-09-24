@@ -58,7 +58,8 @@ export class GeminiTranscriber extends EventEmitter implements SpeechProvider {
           if (sc?.inputTranscription?.text) this.emit("final", sc.inputTranscription.text);
         },
         onerror: (e) => this.emit("error", new Error(e.message ?? "gemini live error")),
-        onclose: () => {
+        onclose: (e) => {
+          if (!this.closed && conn === this.currentConn) console.warn(`[stt] connection closed: ${e.code} ${e.reason}`);
           this.retiring.delete(conn);
           if (conn === this.currentConn && !this.closed) this.reconnect();
         },

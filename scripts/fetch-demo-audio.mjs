@@ -12,6 +12,7 @@ import { join } from "node:path";
 const TALKS = [
   { file: "talk-a", url: "https://www.youtube.com/watch?v=7rteJoZSSzo" }, // Human-Centric Engineering — Ben Popplestone
   { file: "talk-b", url: "https://www.youtube.com/watch?v=GVadbxHks_A" }, // Data Modeling for Software Engineers — Scott Sosna
+  { file: "talk-c", url: "https://www.youtube.com/watch?v=JjPKfcmjKtk" }, // Server-Side WebAssembly — Ramón Huidobro (Context Engine demo)
 ];
 
 const media = join(import.meta.dirname, "..", "media");

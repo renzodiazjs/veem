@@ -20,7 +20,10 @@
         "APAC",
         "P&L"
       ],
-      "source": { "type": "file", "path": "media/talk-a.wav" },
+      "source": {
+        "type": "file",
+        "path": "media/talk-a.wav"
+      },
       "autostart": false,
       "compareBaseline": true
     },
@@ -42,7 +45,42 @@
         "metadata",
         "data architects"
       ],
-      "source": { "type": "file", "path": "media/talk-b.wav" },
+      "source": {
+        "type": "file",
+        "path": "media/talk-b.wav"
+      },
+      "autostart": false,
+      "compareBaseline": true
+    },
+    {
+      "id": "auditorium-c",
+      "title": "Server-Side WebAssembly: The Post-Container Revolution is Here!",
+      "room": "Auditorium C",
+      "speaker": "Ramón Huidobro",
+      "language": "en-US",
+      "glossary": [
+        "WebAssembly",
+        "Wasm",
+        "WASI",
+        "Wasmtime",
+        "WasmEdge",
+        "Solomon Hykes",
+        "Docker",
+        "Kubernetes",
+        "containerd",
+        "runwasi",
+        "Lin Clark",
+        "Mach-O",
+        "ELF",
+        "Fermyon",
+        "Spin",
+        "Nerdearla"
+      ],
+      "source": {
+        "type": "file",
+        "path": "media/talk-c.wav",
+        "startAtSec": 685
+      },
       "autostart": false,
       "compareBaseline": true
     }
