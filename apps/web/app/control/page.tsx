@@ -49,6 +49,12 @@ export default function ControlCenter() {
                 </div>
               </div>
 
+              {s.lastError && (
+                <p role="alert" className="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+                  {s.lastError}
+                </p>
+              )}
+
               <div className="mt-5 flex items-baseline gap-3">
                 <p className="font-mono text-5xl font-bold text-emerald-400">{fmtMs(s.latency.esP50)}</p>
                 <p className="text-sm text-zinc-400">

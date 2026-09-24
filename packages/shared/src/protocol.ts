@@ -56,6 +56,8 @@ export interface SessionSummary {
   glossary: string[];
   startedAt: number | null;
   reconnects: number;
+  /** Provider error while not live, e.g. quota or billing problems */
+  lastError?: string;
   latency: LatencyStats;
   comparison: ContextComparison | null;
 }

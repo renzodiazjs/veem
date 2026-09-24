@@ -33,6 +33,7 @@ export class LiveSession {
   private nextSegId = 1;
   private startedAt: number | null = null;
   private reconnects = 0;
+  private lastError?: string;
   /** Bumped on every start so late callbacks from a previous run are ignored. */
   private runId = 0;
 
@@ -71,6 +72,7 @@ export class LiveSession {
       glossary: this.config.glossary,
       startedAt: this.startedAt,
       reconnects: this.reconnects,
+      lastError: this.health === "live" ? undefined : (this.stt?.lastError ?? this.lastError),
       latency: this.latency.stats(),
       comparison: this.config.compareBaseline
         ? {
@@ -96,6 +98,7 @@ export class LiveSession {
     this.interim = "";
     this.nextSegId = 1;
     this.reconnects = 0;
+    this.lastError = undefined;
     this.segmenter.reset();
     this.latency.reset();
     this.speechEnd.reset();
@@ -123,7 +126,9 @@ export class LiveSession {
       await stt.connect();
     } catch (err) {
       console.error(`[${this.id}] could not connect:`, (err as Error).message);
-      if (run === this.runId) this.setHealth("error");
+      if (run !== this.runId) return;
+      this.lastError = (err as Error).message;
+      this.setHealth("error");
       return;
     }
     // Stopped or restarted while connecting: don't leave an orphan connection.

@@ -5,12 +5,15 @@ const MODEL = process.env.GEMINI_STT_MODEL ?? "gemini-3.5-transcribe-live";
 /** Transcription sessions are capped at ~10 min; rotate before that. */
 const ROTATE_AFTER_MS = 9 * 60 * 1000;
 const MAX_BACKOFF_MS = 8000;
+const CONNECT_TIMEOUT_MS = 10_000;
 
 export interface SpeechProvider extends EventEmitter {
   /** Emits "interim" (text), "final" (text), "open", "reconnecting", "error" (Error) */
   connect(): Promise<void>;
   send(pcm: Buffer): void;
   close(): void;
+  /** Last provider error, if the connection is currently failing */
+  readonly lastError?: string;
 }
 
 export interface TranscriberOptions {
@@ -34,13 +37,20 @@ export class GeminiTranscriber extends EventEmitter implements SpeechProvider {
     await this.open();
   }
 
+  /** Last provider error, surfaced in the Control Center (e.g. "credits depleted"). */
+  lastError?: string;
   private connSeq = 0;
   private currentConn = 0;
   private retiring = new Set<number>();
 
   private async open() {
     const conn = ++this.connSeq;
-    const session: Session = await this.ai.live.connect({
+    // The SDK never settles connect() if the server closes during setup (e.g. billing
+    // or quota errors), so race it against an early close and a timeout.
+    let failSetup!: (err: Error) => void;
+    const setupFailed = new Promise<never>((_, reject) => (failSetup = reject));
+    const timeout = setTimeout(() => failSetup(new Error(`connect timeout after ${CONNECT_TIMEOUT_MS} ms`)), CONNECT_TIMEOUT_MS);
+    const connecting = this.ai.live.connect({
       model: MODEL,
       config: {
         responseModalities: [Modality.TEXT],
@@ -59,12 +69,27 @@ export class GeminiTranscriber extends EventEmitter implements SpeechProvider {
         },
         onerror: (e) => this.emit("error", new Error(e.message ?? "gemini live error")),
         onclose: (e) => {
-          if (!this.closed && conn === this.currentConn) console.warn(`[stt] connection closed: ${e.code} ${e.reason}`);
+          failSetup(new Error(`${e.code} ${e.reason || "closed during setup"}`));
+          if (!this.closed && conn === this.currentConn) {
+            console.warn(`[stt] connection closed: ${e.code} ${e.reason}`);
+            this.lastError = e.reason || `closed (${e.code})`;
+          }
           this.retiring.delete(conn);
           if (conn === this.currentConn && !this.closed) this.reconnect();
         },
       },
     });
+    let session: Session;
+    try {
+      session = await Promise.race([connecting, setupFailed]);
+    } catch (err) {
+      this.lastError = (err as Error).message;
+      connecting.then((s) => s.close()).catch(() => {});
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
+    this.lastError = undefined;
     // close() may have been called while the connection was being established.
     if (this.closed) {
       session.close();
