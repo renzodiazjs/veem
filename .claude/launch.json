@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "veem-server",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@veem/server", "dev"],
+      "port": 8080
+    },
+    {
+      "name": "veem-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@veem/web", "dev"],
+      "port": 3100
+    }
+  ]
+}
