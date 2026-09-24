@@ -1,0 +1,22 @@
+services:
+  server:
+    build: { context: ., target: server }
+    env_file: .env
+    ports: ["8080:8080"]
+    volumes:
+      # Stages are defined here; add an entry to run another room.
+      - ./sessions.json:/app/sessions.json:ro
+      # Demo audio: `node scripts/fetch-demo-audio.mjs` fills this folder.
+      - ./media:/app/media:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8080/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  web:
+    build: { context: ., target: web }
+    ports: ["3100:3100"]
+    depends_on: [server]
+    restart: unless-stopped
