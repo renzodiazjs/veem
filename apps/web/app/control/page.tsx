@@ -57,6 +57,9 @@ export default function ControlCenter() {
                 <Stat label="Muestras" value={s.latency.samples} />
                 <Stat label="Reconexiones" value={s.reconnects} />
                 <Stat label="Glosario" value={`${s.glossary.length} términos`} />
+                {s.comparison && (
+                  <Stat label="Términos: con / sin contexto" value={`${s.comparison.withContext} / ${s.comparison.withoutContext}`} />
+                )}
               </dl>
 
               <div className="mt-5 flex gap-2">
@@ -69,6 +72,11 @@ export default function ControlCenter() {
                 <Link href={`/session/${s.id}`} className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
                   Ver subtítulos →
                 </Link>
+                {s.comparison && (
+                  <Link href={`/session/${s.id}/compare`} className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
+                    Context Engine A/B →
+                  </Link>
+                )}
               </div>
             </article>
           );

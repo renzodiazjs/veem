@@ -11,7 +11,7 @@
         "Nerdearla",
         "Ben Popplestone",
         "KPIs",
-        "Summit fever",
+        "summit fever",
         "Adventure Mindset",
         "Guide Mentality",
         "Adventure Mentors",
@@ -21,7 +21,8 @@
         "P&L"
       ],
       "source": { "type": "file", "path": "media/talk-a.wav" },
-      "autostart": false
+      "autostart": false,
+      "compareBaseline": true
     },
     {
       "id": "auditorium-b",
@@ -42,7 +43,8 @@
         "data architects"
       ],
       "source": { "type": "file", "path": "media/talk-b.wav" },
-      "autostart": false
+      "autostart": false,
+      "compareBaseline": true
     }
   ]
 }

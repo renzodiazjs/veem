@@ -6,10 +6,12 @@ import type { Translator } from "./providers/Translator";
 import { SentenceSegmenter } from "./SentenceSegmenter";
 import { SpeechEndDetector } from "./audio/energy";
 import { LatencyTracker } from "./metrics";
+import { TermCounter } from "./context/termCounter";
 import type { SessionConfig } from "./config";
 
 const MAX_SEGMENTS = 500;
 const TRANSLATION_CONTEXT = 2;
+const MAX_BASELINE_LINES = 100;
 /** Drop interim updates for clients whose send buffer is backed up (bytes). */
 const SLOW_CLIENT_BYTES = 1_000_000;
 
@@ -26,6 +28,12 @@ export class LiveSession {
 
   private source?: AudioSource;
   private stt?: SpeechProvider;
+  /** Same audio, no context: the A/B baseline for the Technical Context Engine. */
+  private baselineStt?: SpeechProvider;
+  private baseline: { id: number; text: string }[] = [];
+  private nextBaselineId = 1;
+  private readonly termsWith: TermCounter;
+  private readonly termsWithout: TermCounter;
   private readonly segmenter = new SentenceSegmenter();
   private readonly latency = new LatencyTracker();
   private readonly speechEnd = new SpeechEndDetector();
@@ -33,6 +41,8 @@ export class LiveSession {
 
   constructor(private readonly config: SessionConfig, private readonly translator: Translator) {
     this.id = config.id;
+    this.termsWith = new TermCounter(config.glossary);
+    this.termsWithout = new TermCounter(config.glossary);
   }
 
   summary(): SessionSummary {
@@ -47,11 +57,18 @@ export class LiveSession {
       startedAt: this.startedAt,
       reconnects: this.reconnects,
       latency: this.latency.stats(),
+      comparison: this.config.compareBaseline
+        ? {
+            withContext: this.termsWith.total(),
+            withoutContext: this.termsWithout.total(),
+            byTerm: this.config.glossary.map((t) => [t, this.termsWith.counts.get(t)!, this.termsWithout.counts.get(t)!]),
+          }
+        : null,
     };
   }
 
   snapshot(): ServerMsg {
-    return { t: "snapshot", sessionId: this.id, summary: this.summary(), segments: this.segments, interim: this.interim };
+    return { t: "snapshot", sessionId: this.id, summary: this.summary(), segments: this.segments, interim: this.interim, baseline: this.baseline };
   }
 
   async start() {
@@ -64,6 +81,10 @@ export class LiveSession {
     this.segmenter.reset();
     this.latency.reset();
     this.speechEnd.reset();
+    this.baseline = [];
+    this.nextBaselineId = 1;
+    this.termsWith.reset();
+    this.termsWithout.reset();
     this.startedAt = Date.now();
     this.setHealth("connecting");
     this.broadcast(this.snapshot());
@@ -89,11 +110,25 @@ export class LiveSession {
     }
     if (run !== this.runId) return;
 
+    if (this.config.compareBaseline) {
+      const baseline = new GeminiTranscriber({ languageCodes: [this.config.language], vocabulary: [] });
+      baseline.on("final", (text: string) => run === this.runId && this.onBaseline(text));
+      baseline.on("error", (err: Error) => console.error(`[${this.id}] baseline stt error:`, err.message));
+      try {
+        await baseline.connect();
+        this.baselineStt = baseline;
+      } catch (err) {
+        console.error(`[${this.id}] baseline disabled:`, (err as Error).message);
+      }
+      if (run !== this.runId) return baseline.close();
+    }
+
     const source = new FileSource(this.config.source.path, this.config.source.startAtSec);
     this.source = source;
     source.on("chunk", (pcm: Buffer) => {
       this.speechEnd.push(pcm);
       stt.send(pcm);
+      this.baselineStt?.send(pcm);
     });
     source.on("error", (err: Error) => {
       console.error(`[${this.id}] audio error:`, err.message);
@@ -107,8 +142,10 @@ export class LiveSession {
     this.runId++;
     this.source?.stop();
     this.stt?.close();
+    this.baselineStt?.close();
     this.source = undefined;
     this.stt = undefined;
+    this.baselineStt = undefined;
     if (this.health !== "idle") this.setHealth("ended");
   }
 
@@ -121,12 +158,15 @@ export class LiveSession {
     const silence = Buffer.alloc(CHUNK_BYTES);
     for (let i = 0; i < 20 && run === this.runId; i++) {
       this.stt?.send(silence);
+      this.baselineStt?.send(silence);
       await new Promise((r) => setTimeout(r, 100));
     }
     await new Promise((r) => setTimeout(r, 5000));
     if (run !== this.runId) return;
     this.stt?.close();
+    this.baselineStt?.close();
     this.stt = undefined;
+    this.baselineStt = undefined;
     this.source = undefined;
     this.setHealth("ended");
   }
@@ -138,10 +178,20 @@ export class LiveSession {
   }
 
   private onFinal(text: string) {
+    // A/B fairness: both sides count glossary terms on finals only.
+    this.termsWith.add(text);
     const { commits } = this.segmenter.final(text);
     // Only the last sentence of an utterance ends where the speech ended.
     commits.forEach((s, i) => this.commit(s, i === commits.length - 1));
     this.setInterim("");
+  }
+
+  private onBaseline(text: string) {
+    const line = { id: this.nextBaselineId++, text };
+    this.baseline.push(line);
+    if (this.baseline.length > MAX_BASELINE_LINES) this.baseline.shift();
+    this.termsWithout.add(text);
+    this.broadcast({ t: "baseline", sessionId: this.id, ...line });
   }
 
   private setInterim(text: string) {

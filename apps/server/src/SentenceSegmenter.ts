@@ -6,8 +6,10 @@
  * trimmed at the start, and the final transcript may reword the interim.
  * So sentences are deduplicated by content, never by position:
  *  - a sentence is "stable" once more text follows its closing punctuation;
- *  - it is committed unless it overlaps heavily with a recent commit
- *    (catches trimmed prefixes like "to Nerdearla." and final rewordings).
+ *  - it is committed unless its word bigrams are mostly already present in
+ *    the recent commits taken together (catches trimmed prefixes like
+ *    "to Nerdearla.", rewordings, and finals that merge several committed
+ *    sentences into one).
  */
 export interface SegmenterResult {
   commits: string[];
@@ -56,7 +58,7 @@ export class SentenceSegmenter {
   private recent: string[] = [];
 
   private isKnown(sentence: string) {
-    return this.recent.some((r) => overlap(sentence, r) >= OVERLAP);
+    return overlap(sentence, this.recent.join(" ")) >= OVERLAP;
   }
 
   private take(sentences: string[]): string[] {

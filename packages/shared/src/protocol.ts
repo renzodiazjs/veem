@@ -33,6 +33,16 @@ export interface LatencyStats {
   samples: number;
 }
 
+/** Technical Context Engine A/B: same audio transcribed with and without the talk context. */
+export interface ContextComparison {
+  /** Glossary term mentions recognized in the context-aware transcript */
+  withContext: number;
+  /** Glossary term mentions recognized in the baseline (no context) transcript */
+  withoutContext: number;
+  /** Per-term counts: [term, withContext, withoutContext] */
+  byTerm: [string, number, number][];
+}
+
 export interface SessionSummary {
   id: string;
   title: string;
@@ -44,6 +54,7 @@ export interface SessionSummary {
   startedAt: number | null;
   reconnects: number;
   latency: LatencyStats;
+  comparison: ContextComparison | null;
 }
 
 export type ClientMsg =
@@ -53,9 +64,11 @@ export type ClientMsg =
 
 export type ServerMsg =
   | { t: "sessions"; list: SessionSummary[]; serverTime: number }
-  | { t: "snapshot"; sessionId: string; summary: SessionSummary; segments: Segment[]; interim: string }
+  | { t: "snapshot"; sessionId: string; summary: SessionSummary; segments: Segment[]; interim: string; baseline: { id: number; text: string }[] }
   | { t: "interim"; sessionId: string; text: string }
   | { t: "final"; sessionId: string; seg: Segment }
   | { t: "translation"; sessionId: string; segId: number; es: string; translationReceivedAt: number }
   | { t: "health"; sessionId: string; health: Health }
+  /** Baseline transcript line (no context) — only when compareBaseline is on */
+  | { t: "baseline"; sessionId: string; id: number; text: string }
   | { t: "error"; message: string };

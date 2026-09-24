@@ -69,13 +69,15 @@ export interface CaptionState {
   health: Health;
   segments: Segment[];
   interim: string;
+  /** Baseline (no context) transcript lines, when the session runs the A/B comparison */
+  baseline: { id: number; text: string }[];
   error?: string;
 }
 
 const MAX_CLIENT_SEGMENTS = 200;
 
 export function useCaptions(sessionId: string) {
-  const [state, setState] = useState<CaptionState>({ health: "idle", segments: [], interim: "" });
+  const [state, setState] = useState<CaptionState>({ health: "idle", segments: [], interim: "", baseline: [] });
 
   const connected = useSocket([{ t: "subscribe", sessionId }, { t: "watchSessions" }], (msg) => {
     if (msg.t === "sessions") {
@@ -89,7 +91,16 @@ export function useCaptions(sessionId: string) {
     setState((s) => {
       switch (msg.t) {
         case "snapshot":
-          return { summary: msg.summary, health: msg.summary.health, segments: msg.segments.slice(-MAX_CLIENT_SEGMENTS), interim: msg.interim };
+          return {
+            summary: msg.summary,
+            health: msg.summary.health,
+            segments: msg.segments.slice(-MAX_CLIENT_SEGMENTS),
+            interim: msg.interim,
+            baseline: msg.baseline.slice(-MAX_CLIENT_SEGMENTS),
+          };
+        case "baseline":
+          if (s.baseline.some((x) => x.id === msg.id)) return s;
+          return { ...s, baseline: [...s.baseline, { id: msg.id, text: msg.text }].slice(-MAX_CLIENT_SEGMENTS) };
         case "interim":
           return { ...s, interim: msg.text };
         case "final":

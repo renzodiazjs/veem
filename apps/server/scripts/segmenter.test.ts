@@ -35,3 +35,10 @@ test("short sentence sharing common words with a previous one is kept", () => {
   s.interim("So I'm, you know, I'm familiar with what we're going to talk about today. I also");
   assert.deepEqual(s.final("I also do speaking. Obviously, I'm here today.").commits, ["I also do speaking.", "Obviously, I'm here today."]);
 });
+
+test("final that merges several committed sentences is skipped", () => {
+  const s = new SentenceSegmenter();
+  s.interim("It takes me over an hour and a half, and when I get back to her, it's dark. She's freezing. She's frightened. And");
+  const r = s.final("It takes me over an hour and a half, and when I get back to her, it's dark, she doesn't have a torch, she's freezing, she's frightened, and she's in bits.");
+  assert.deepEqual(r.commits, []);
+});

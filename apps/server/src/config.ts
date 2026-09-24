@@ -12,6 +12,8 @@ export interface SessionConfig {
   glossary: string[];
   source: { type: "file"; path: string; loop?: boolean; startAtSec?: number };
   autostart?: boolean;
+  /** Also run a baseline transcription without context, to show the Context Engine's effect live (2× STT cost). */
+  compareBaseline?: boolean;
 }
 
 export interface ConferenceConfig {
