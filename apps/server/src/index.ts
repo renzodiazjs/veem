@@ -105,6 +105,9 @@ setInterval(() => {
 http.listen(port, () => {
   console.log(`veem: "${conference.name}" — ${conference.sessions.length} sessions — translator: ${translator.name}`);
   console.log(`listening on http://localhost:${port} (ws: /ws)`);
+  // Masked, so a stale key inherited from the environment is easy to spot.
+  const key = process.env.GEMINI_API_KEY;
+  console.log(`gemini key: ${key ? "…" + key.slice(-4) : "MISSING"}`);
   manager.startAutostart();
 });
 
